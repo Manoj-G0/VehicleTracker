@@ -18,6 +18,8 @@ FILTER_COLUMNS = {
     "rlf_id": Vehicle.rlf_id,
     "rm_id": Vehicle.rm_id,
     "ip_id": Vehicle.ip_id,
+    "rm_rlf_band": Vehicle.rm_rlf_band,
+    "ip_band": Vehicle.ip_band,
     "evap_id": Vehicle.evap_id,
     "pr_id": Vehicle.pr_id,
     "df_id": Vehicle.df_id,
@@ -91,6 +93,39 @@ class VehicleRepository:
         )).all())
         return variants, total
 
+    async def get_variant_by_name(self, vehicle_id: int, variant_name: str) -> Variant | None:
+        return await self.session.scalar(
+            select(Variant).where(
+                Variant.vehicle_id == vehicle_id,
+                func.lower(Variant.variant_name) == variant_name.strip().lower(),
+            )
+        )
+
+    async def get_variant_by_id(self, vehicle_id: int, variant_id: int) -> Variant | None:
+        return await self.session.scalar(
+            select(Variant).where(Variant.vehicle_id == vehicle_id, Variant.id == variant_id)
+        )
+
+    async def create_variant(self, vehicle_id: int, payload) -> Variant:
+        variant = Variant(vehicle_id=vehicle_id, **payload.model_dump())
+        self.session.add(variant)
+        await self.session.flush()
+        await self.session.refresh(variant)
+        return variant
+
+    async def update_variant(self, variant: Variant, payload) -> Variant:
+        variant.variant_name = payload.variant_name
+        variant.equation = payload.equation
+        variant.cycle_energy_demand = payload.cycle_energy_demand
+        variant.co2 = payload.co2
+        await self.session.flush()
+        await self.session.refresh(variant)
+        return variant
+
+    async def delete_variant(self, variant: Variant) -> None:
+        await self.session.delete(variant)
+        await self.session.flush()
+
     async def get_by_name(self, base_model_name: str) -> Vehicle | None:
         stmt = (
             self._active()
@@ -117,13 +152,23 @@ class VehicleRepository:
             rlf_id=payload.rlf_id,
             rm_id=payload.rm_id,
             ip_id=payload.ip_id,
+            rm_rlf_band=payload.rm_rlf_band,
+            ip_band=payload.ip_band,
             evap_id=payload.evap_id,
             pr_id=payload.pr_id,
             df_id=payload.df_id,
             ob_id=payload.ob_id,
             er_id=payload.er_id,
             pems_id=payload.pems_id,
-            variants=[Variant(variant_name=item.variant_name) for item in payload.variants],
+            variants=[
+                Variant(
+                    variant_name=item.variant_name,
+                    equation=item.equation,
+                    cycle_energy_demand=item.cycle_energy_demand,
+                    co2=item.co2,
+                )
+                for item in payload.variants
+            ],
         )
         self.session.add(vehicle)
         await self.session.flush()
@@ -135,6 +180,8 @@ class VehicleRepository:
         vehicle.rlf_id = payload.rlf_id
         vehicle.rm_id = payload.rm_id
         vehicle.ip_id = payload.ip_id
+        vehicle.rm_rlf_band = payload.rm_rlf_band
+        vehicle.ip_band = payload.ip_band
         vehicle.evap_id = payload.evap_id
         vehicle.pr_id = payload.pr_id
         vehicle.df_id = payload.df_id
@@ -142,21 +189,42 @@ class VehicleRepository:
         vehicle.er_id = payload.er_id
         vehicle.pems_id = payload.pems_id
 
-        desired = {item.variant_name: item.variant_name for item in payload.variants}
-        desired_lower = {name.lower(): name for name in desired}
+        desired = {item.variant_name.lower(): item for item in payload.variants}
         existing_by_lower = {variant.variant_name.lower(): variant for variant in vehicle.variants}
 
         for key, variant in list(existing_by_lower.items()):
-            if key not in desired_lower:
+            if key not in desired:
                 vehicle.variants.remove(variant)
 
-        for key, name in desired_lower.items():
-            if key not in existing_by_lower:
-                vehicle.variants.append(Variant(variant_name=name))
+        for key, item in desired.items():
+            existing = existing_by_lower.get(key)
+            if existing is None:
+                vehicle.variants.append(
+                    Variant(
+                        variant_name=item.variant_name,
+                        equation=item.equation,
+                        cycle_energy_demand=item.cycle_energy_demand,
+                        co2=item.co2,
+                    )
+                )
+            else:
+                existing.variant_name = item.variant_name
+                existing.equation = item.equation
+                existing.cycle_energy_demand = item.cycle_energy_demand
+                existing.co2 = item.co2
 
         await self.session.flush()
         await self.session.refresh(vehicle)
         return vehicle
+
+    async def export_rows(self, filters: VehicleFilterParams) -> list[Vehicle]:
+        stmt = (
+            self._apply_filters(self._active(), filters)
+            .options(selectinload(Vehicle.variants))
+            .order_by(Vehicle.base_model_name, Vehicle.id)
+        )
+        vehicles = list((await self.session.scalars(stmt)).unique().all())
+        return vehicles
 
     async def soft_delete(self, vehicle: Vehicle) -> None:
         vehicle.deleted_at = datetime.now(timezone.utc)

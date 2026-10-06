@@ -13,6 +13,8 @@ class VehicleFilterParams(BaseModel):
     rlf_id: str | None = None
     rm_id: str | None = None
     ip_id: str | None = None
+    rm_rlf_band: str | None = None
+    ip_band: str | None = None
     evap_id: str | None = None
     pr_id: str | None = None
     df_id: str | None = None
@@ -26,6 +28,8 @@ class VehicleFilterParams(BaseModel):
         "rlf_id",
         "rm_id",
         "ip_id",
+        "rm_rlf_band",
+        "ip_band",
         "evap_id",
         "pr_id",
         "df_id",
@@ -48,6 +52,8 @@ class VehicleBase(BaseModel):
     rlf_id: str | None = Field(default=None, max_length=255)
     rm_id: str | None = Field(default=None, max_length=255)
     ip_id: str | None = Field(default=None, max_length=255)
+    rm_rlf_band: str | None = Field(default=None, max_length=64)
+    ip_band: str | None = Field(default=None, max_length=64)
     evap_id: str | None = Field(default=None, max_length=255)
     pr_id: str | None = Field(default=None, max_length=255)
     df_id: str | None = Field(default=None, max_length=255)
@@ -67,6 +73,8 @@ class VehicleBase(BaseModel):
         "rlf_id",
         "rm_id",
         "ip_id",
+        "rm_rlf_band",
+        "ip_band",
         "evap_id",
         "pr_id",
         "df_id",
@@ -78,6 +86,17 @@ class VehicleBase(BaseModel):
     @classmethod
     def _normalize_ids(cls, value: str | None) -> str | None:
         return normalize_identifier(value)
+
+    @model_validator(mode="after")
+    def _validate_bands(self) -> "VehicleBase":
+        has_rm = bool(self.rm_id)
+        has_rlf = bool(self.rlf_id)
+        has_rm_band = bool(self.rm_rlf_band)
+        if has_rm_band and not (has_rm or has_rlf):
+            raise ValueError("RM/RLF band requires either an RM ID or an RLF ID")
+        if self.ip_band and not self.ip_id:
+            raise ValueError("IP Band requires an IP ID")
+        return self
 
 
 class VehicleCreate(VehicleBase):

@@ -24,6 +24,8 @@ def upgrade() -> None:
         sa.Column("rlf_id", sa.String(length=255), nullable=True),
         sa.Column("rm_id", sa.String(length=255), nullable=True),
         sa.Column("ip_id", sa.String(length=255), nullable=True),
+        sa.Column("rm_rlf_band", sa.String(length=64), nullable=True),
+        sa.Column("ip_band", sa.String(length=64), nullable=True),
         sa.Column("evap_id", sa.String(length=255), nullable=True),
         sa.Column("pr_id", sa.String(length=255), nullable=True),
         sa.Column("df_id", sa.String(length=255), nullable=True),

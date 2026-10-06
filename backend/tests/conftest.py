@@ -1,5 +1,7 @@
 """Shared test fixtures. Requires PostgreSQL (see DATABASE_URL)."""
 
+import asyncio
+import sys
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -7,6 +9,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 import bcrypt
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from app.core.config import get_settings
 from app.db.session import get_db
@@ -39,6 +44,8 @@ async def clean_db() -> AsyncGenerator[None, None]:
         await conn.execute(text("DELETE FROM variants"))
         await conn.execute(text("DELETE FROM vehicles"))
         await conn.execute(text("DELETE FROM refresh_tokens"))
+        await conn.execute(text("DELETE FROM password_reset_verifications"))
+        await conn.execute(text("DELETE FROM registration_verifications"))
         await conn.execute(text("DELETE FROM users"))
     app.dependency_overrides[get_db] = _override_get_db
     yield

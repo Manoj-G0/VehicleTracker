@@ -39,6 +39,8 @@ class Vehicle(TimestampMixin, Base):
     rlf_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rm_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ip_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rm_rlf_band: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ip_band: Mapped[str | None] = mapped_column(String(64), nullable=True)
     evap_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     pr_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     df_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -50,6 +52,6 @@ class Vehicle(TimestampMixin, Base):
     variants: Mapped[list[Variant]] = relationship(
         back_populates="vehicle",
         cascade="all, delete-orphan",
-        lazy="noload",
+        lazy="selectin",
         order_by="Variant.variant_name",
     )

@@ -25,3 +25,13 @@ class User(TimestampMixin, Base):
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
+    registration_verifications = relationship(
+        "RegistrationVerification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    password_resets = relationship(
+        "PasswordResetVerification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

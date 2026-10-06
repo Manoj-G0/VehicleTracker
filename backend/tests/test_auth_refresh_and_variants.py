@@ -1,15 +1,17 @@
 """Focused coverage for registration, refresh sessions, access, and variant paging."""
 
 from tests.conftest import sample_vehicle_payload
+from app.services.email_service import EmailService
 
 
-async def test_registration_starts_without_application_access(client):
+async def test_registration_starts_without_application_access(client, monkeypatch):
+    monkeypatch.setattr(EmailService, "send_otp_email", lambda *args, **kwargs: None)
     response = await client.post(
         "/api/v1/auth/register",
         json={"username": "new-user", "email": "new@example.com", "password": "StrongPass123!"},
     )
-    assert response.status_code == 201
-    assert response.json()["allow_access"] is False
+    assert response.status_code == 200
+    assert response.json()["status"] == "otp_sent"
 
     login = await client.post(
         "/api/v1/auth/login",

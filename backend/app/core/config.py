@@ -23,7 +23,17 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=30, ge=1)
     refresh_token_expire_days: int = Field(default=7, ge=1)
-    default_user_password: str = "test"
+    default_user_password: str = "123456789"
+    admin_email: str = "manojkumarmiriyala34@gmail.com"
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Vehicle Master Tracker"
+    otp_expiry_minutes: int = Field(default=5, ge=1)
+    otp_max_attempts: int = Field(default=5, ge=1)
+    otp_resend_cooldown_seconds: int = Field(default=300, ge=1)
 
     database_url: str = (
         "postgresql+asyncpg://vehicle_user:vehicle_password@localhost:5432/vehicle_master"

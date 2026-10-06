@@ -1,7 +1,10 @@
 """Vehicle business rules."""
 
+from io import BytesIO
 from math import ceil
+from zipfile import ZIP_STORED, ZipFile
 
+from openpyxl import Workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationAppError
@@ -14,7 +17,7 @@ from app.schemas.vehicle import (
     VehicleRead,
     VehicleUpdate,
 )
-from app.schemas.variant import VariantPage, VariantRead
+from app.schemas.variant import VariantCreate, VariantPage, VariantRead
 
 
 class VehicleService:
@@ -72,6 +75,105 @@ class VehicleService:
             total=total,
             total_pages=ceil(total / page_size) if total else 0,
         )
+
+    async def create_variant(self, vehicle_id: int, payload: VariantCreate) -> VariantRead:
+        if await self.repository.get_by_id(vehicle_id, include_variants=False) is None:
+            raise NotFoundError("Vehicle not found")
+        if await self.repository.get_variant_by_name(vehicle_id, payload.variant_name):
+            raise ConflictError("A variant with this name already exists for this vehicle", field="variant_name")
+        return VariantRead.model_validate(await self.repository.create_variant(vehicle_id, payload))
+
+    async def update_variant(self, vehicle_id: int, variant_id: int, payload: VariantCreate) -> VariantRead:
+        variant = await self.repository.get_variant_by_id(vehicle_id, variant_id)
+        if variant is None:
+            raise NotFoundError("Variant not found")
+        duplicate = await self.repository.get_variant_by_name(vehicle_id, payload.variant_name)
+        if duplicate is not None and duplicate.id != variant.id:
+            raise ConflictError("A variant with this name already exists for this vehicle", field="variant_name")
+        return VariantRead.model_validate(await self.repository.update_variant(variant, payload))
+
+    async def delete_variant(self, vehicle_id: int, variant_id: int) -> None:
+        variant = await self.repository.get_variant_by_id(vehicle_id, variant_id)
+        if variant is None:
+            raise NotFoundError("Variant not found")
+        await self.repository.delete_variant(variant)
+
+    async def export_vehicles(self, filters: VehicleFilterParams) -> bytes:
+        vehicles = await self.repository.export_rows(filters)
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Vehicles"
+        headers = [
+            "Base Model Name",
+            "RLF ID",
+            "RM ID",
+            "IP ID",
+            "RM/RLF Band",
+            "IP Band",
+            "EVAP ID",
+            "PR ID",
+            "DF ID",
+            "OB ID",
+            "ER ID",
+            "PEMS ID",
+            "Variant Name",
+            "Equation",
+            "Cycle Energy Demand",
+            "CO2",
+        ]
+        worksheet.append(headers)
+
+        for vehicle in vehicles:
+            base_row = [
+                vehicle.base_model_name,
+                vehicle.rlf_id,
+                vehicle.rm_id,
+                vehicle.ip_id,
+                vehicle.rm_rlf_band,
+                vehicle.ip_band,
+                vehicle.evap_id,
+                vehicle.pr_id,
+                vehicle.df_id,
+                vehicle.ob_id,
+                vehicle.er_id,
+                vehicle.pems_id,
+                "",
+                "",
+                "",
+                "",
+            ]
+            if not vehicle.variants:
+                worksheet.append(base_row)
+                continue
+            for variant in vehicle.variants:
+                worksheet.append([
+                    vehicle.base_model_name,
+                    vehicle.rlf_id,
+                    vehicle.rm_id,
+                    vehicle.ip_id,
+                    vehicle.rm_rlf_band,
+                    vehicle.ip_band,
+                    vehicle.evap_id,
+                    vehicle.pr_id,
+                    vehicle.df_id,
+                    vehicle.ob_id,
+                    vehicle.er_id,
+                    vehicle.pems_id,
+                    variant.variant_name,
+                    variant.equation,
+                    variant.cycle_energy_demand,
+                    variant.co2,
+                ])
+
+        buffer = BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        rewritten = BytesIO()
+        with ZipFile(buffer, "r") as source:
+            with ZipFile(rewritten, mode="w", compression=ZIP_STORED) as target:
+                for info in source.infolist():
+                    target.writestr(info.filename, source.read(info.filename), compress_type=ZIP_STORED)
+        return rewritten.getvalue()
 
     async def create_vehicle(self, payload: VehicleCreate) -> VehicleRead:
         existing = await self.repository.get_by_name(payload.base_model_name)

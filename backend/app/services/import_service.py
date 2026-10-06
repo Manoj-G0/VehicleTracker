@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ValidationAppError
+from app.core.exceptions import AppError, ValidationAppError
 from app.core.logging import get_logger
 from app.core.security import CurrentUser
 from app.models.variant import Variant
@@ -129,9 +129,10 @@ class ImportService:
                 created_by=user.username,
                 started_at=started,
             )
-        except Exception:
+        except Exception as exc:
+            await self.session.rollback()
             logger.error("excel_import_failed", file_name=file_name)
-            raise
+            raise AppError("An unexpected error occurred while importing the workbook.", status_code=500) from exc
 
         logger.info(
             "excel_import_end",

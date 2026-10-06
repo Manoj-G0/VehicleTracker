@@ -106,3 +106,43 @@ async def test_delete_vehicle_soft(client):
 async def test_delete_not_found(client):
     response = await client.delete("/api/v1/vehicles/42")
     assert response.status_code == 404
+
+
+async def test_variant_crud_preserves_metadata(client):
+    vehicle = (await client.post("/api/v1/vehicles", json=sample_vehicle_payload(variants=[]))).json()
+    path = f"/api/v1/vehicles/{vehicle['id']}/variants"
+    created = await client.post(path, json={
+        "variant_name": "Long Range",
+        "equation": "E = P * t",
+        "cycle_energy_demand": "14.2 kWh/100km",
+        "co2": "0 g/km",
+    })
+    assert created.status_code == 201
+    variant = created.json()
+    assert variant["equation"] == "E = P * t"
+    assert variant["cycle_energy_demand"] == "14.2 kWh/100km"
+    assert variant["co2"] == "0 g/km"
+
+    updated = await client.put(f"{path}/{variant['id']}", json={
+        "variant_name": "Long Range Plus",
+        "equation": "E = V * I * t",
+        "cycle_energy_demand": "13.8 kWh/100km",
+        "co2": "2 g/km",
+    })
+    assert updated.status_code == 200
+    assert updated.json()["variant_name"] == "Long Range Plus"
+    assert updated.json()["co2"] == "2 g/km"
+
+    listed = await client.get(path)
+    assert listed.json()["items"] == [updated.json()]
+    deleted = await client.delete(f"{path}/{variant['id']}")
+    assert deleted.status_code == 204
+    assert (await client.get(path)).json()["total"] == 0
+
+
+async def test_variant_crud_rejects_duplicate_name(client):
+    vehicle = (await client.post("/api/v1/vehicles", json=sample_vehicle_payload(variants=[]))).json()
+    path = f"/api/v1/vehicles/{vehicle['id']}/variants"
+    await client.post(path, json={"variant_name": "Standard"})
+    duplicate = await client.post(path, json={"variant_name": "standard"})
+    assert duplicate.status_code == 409

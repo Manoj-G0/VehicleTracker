@@ -114,6 +114,49 @@ class UserRegistration(BaseModel):
         return value
 
 
+class VerifyRegistrationRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+
+    @field_validator("otp", mode="before")
+    @classmethod
+    def _validate_otp(cls, value: object) -> str:
+        if not isinstance(value, str) or len(value) != 6 or not value.isdigit():
+            raise ValueError("OTP must be exactly 6 digits")
+        return value
+
+
+class EmailOtpRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordVerifyRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+
+    @field_validator("otp", mode="before")
+    @classmethod
+    def _validate_otp(cls, value: object) -> str:
+        if not isinstance(value, str) or len(value) != 6 or not value.isdigit():
+            raise ValueError("OTP must be exactly 6 digits")
+        return value
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+    confirm_password: str = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def _matching_passwords(self) -> "ResetPasswordRequest":
+        if self.new_password != self.confirm_password:
+            raise ValueError("New password and confirmation must match")
+        if not any(ch.isupper() for ch in self.new_password) or not any(ch.isdigit() for ch in self.new_password):
+            raise ValueError("Password must contain at least one uppercase character and one number")
+        return self
+
+
 class PasswordChange(BaseModel):
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8, max_length=128)

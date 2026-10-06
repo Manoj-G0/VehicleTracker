@@ -2,7 +2,7 @@ export const labels = {
   brand: "VehicleTracker",
   common: {
     apply: "Apply",
-    cancel: "Cancel",
+    cancel: "Reset",
     close: "Close",
     delete: "Delete",
     edit: "Edit",
@@ -16,6 +16,8 @@ export const labels = {
     create: "Create",
     preview: "Preview",
     upload: "Upload",
+    export: "Export",
+    reset: "Reset",
   },
   navigation: {
     search: "Search Vehicles",
@@ -59,6 +61,10 @@ export const labels = {
     currentPassword: "Current Password",
     newPassword: "New Password",
     confirmPassword: "Confirm Password",
+    forgotPassword: "Forgot Password",
+    resetPassword: "Reset Password",
+    otpCode: "Verification Code",
+    registerHeader: "Create account",
     registrationPending: "Registration complete. An administrator must grant application access before you can sign in.",
   },
 } as const;
@@ -67,6 +73,8 @@ export const identifierLabels = {
   rlf_id: "RLF ID",
   rm_id: "RM ID",
   ip_id: "IP ID",
+  rm_rlf_band: "RM/RLF Band",
+  ip_band: "IP Band",
   evap_id: "EVAP ID",
   pr_id: "PR ID",
   df_id: "DF ID",

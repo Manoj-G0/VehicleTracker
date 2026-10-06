@@ -1,6 +1,9 @@
 """Vehicle CRUD and search APIs."""
 
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -13,7 +16,7 @@ from app.schemas.vehicle import (
     VehicleRead,
     VehicleUpdate,
 )
-from app.schemas.variant import VariantPage
+from app.schemas.variant import VariantCreate, VariantPage, VariantRead
 from app.services.vehicle_service import VehicleService
 
 router = APIRouter()
@@ -40,6 +43,8 @@ async def list_vehicles(
     rlf_id: str | None = Query(default=None),
     rm_id: str | None = Query(default=None),
     ip_id: str | None = Query(default=None),
+    rm_rlf_band: str | None = Query(default=None),
+    ip_band: str | None = Query(default=None),
     evap_id: str | None = Query(default=None),
     pr_id: str | None = Query(default=None),
     df_id: str | None = Query(default=None),
@@ -56,6 +61,8 @@ async def list_vehicles(
         rlf_id=rlf_id,
         rm_id=rm_id,
         ip_id=ip_id,
+        rm_rlf_band=rm_rlf_band,
+        ip_band=ip_band,
         evap_id=evap_id,
         pr_id=pr_id,
         df_id=df_id,
@@ -66,6 +73,50 @@ async def list_vehicles(
     )
     size = page_size or settings.default_page_size
     return await service.list_vehicles(filters, page, size, settings.max_page_size)
+
+
+@router.get(
+    "/vehicles/export",
+    summary="Export filtered vehicles to Excel",
+)
+async def export_vehicles(
+    base_model_name: str | None = Query(default=None),
+    rlf_id: str | None = Query(default=None),
+    rm_id: str | None = Query(default=None),
+    ip_id: str | None = Query(default=None),
+    rm_rlf_band: str | None = Query(default=None),
+    ip_band: str | None = Query(default=None),
+    evap_id: str | None = Query(default=None),
+    pr_id: str | None = Query(default=None),
+    df_id: str | None = Query(default=None),
+    ob_id: str | None = Query(default=None),
+    er_id: str | None = Query(default=None),
+    pems_id: str | None = Query(default=None),
+    variant_name: str | None = Query(default=None),
+    service: VehicleService = Depends(get_vehicle_service),
+    _: CurrentUser = Depends(require_viewer),
+) -> StreamingResponse:
+    filters = VehicleFilterParams(
+        base_model_name=base_model_name,
+        rlf_id=rlf_id,
+        rm_id=rm_id,
+        ip_id=ip_id,
+        rm_rlf_band=rm_rlf_band,
+        ip_band=ip_band,
+        evap_id=evap_id,
+        pr_id=pr_id,
+        df_id=df_id,
+        ob_id=ob_id,
+        er_id=er_id,
+        pems_id=pems_id,
+        variant_name=variant_name,
+    )
+    workbook = await service.export_vehicles(filters)
+    return StreamingResponse(
+        BytesIO(workbook),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=vehicles.xlsx"},
+    )
 
 
 @router.get(
@@ -92,6 +143,38 @@ async def list_variants(
     _: CurrentUser = Depends(require_viewer),
 ) -> VariantPage:
     return await service.list_variants(vehicle_id, page, page_size or 20, settings.max_page_size)
+
+
+@router.post("/vehicles/{vehicle_id}/variants", response_model=VariantRead, status_code=status.HTTP_201_CREATED)
+async def create_variant(
+    vehicle_id: int,
+    payload: VariantCreate,
+    service: VehicleService = Depends(get_vehicle_service),
+    _: CurrentUser = Depends(require_importer),
+) -> VariantRead:
+    return await service.create_variant(vehicle_id, payload)
+
+
+@router.put("/vehicles/{vehicle_id}/variants/{variant_id}", response_model=VariantRead)
+async def update_variant(
+    vehicle_id: int,
+    variant_id: int,
+    payload: VariantCreate,
+    service: VehicleService = Depends(get_vehicle_service),
+    _: CurrentUser = Depends(require_importer),
+) -> VariantRead:
+    return await service.update_variant(vehicle_id, variant_id, payload)
+
+
+@router.delete("/vehicles/{vehicle_id}/variants/{variant_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_variant(
+    vehicle_id: int,
+    variant_id: int,
+    service: VehicleService = Depends(get_vehicle_service),
+    _: CurrentUser = Depends(require_importer),
+) -> Response:
+    await service.delete_variant(vehicle_id, variant_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

@@ -28,5 +28,8 @@ class Variant(TimestampMixin, Base):
         nullable=False,
     )
     variant_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    equation: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    cycle_energy_demand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    co2: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     vehicle: Mapped[Vehicle] = relationship(back_populates="variants")

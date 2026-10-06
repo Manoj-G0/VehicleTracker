@@ -8,6 +8,8 @@ from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.password_reset import PasswordResetVerification
+from app.models.registration_verification import RegistrationVerification
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.models.refresh_token import RefreshToken
@@ -31,18 +33,135 @@ class UserRepository:
         normalized = email.strip().lower()
         return await self.session.scalar(self._active().where(func.lower(User.email) == normalized))
 
+    async def get_registration_verification(self, email: str) -> RegistrationVerification | None:
+        normalized = email.strip().lower()
+        return await self.session.scalar(
+            select(RegistrationVerification).where(
+                func.lower(RegistrationVerification.email) == normalized,
+                RegistrationVerification.is_active.is_(True),
+            )
+        )
+
+    async def create_registration_verification(
+        self,
+        *,
+        username: str,
+        email: str,
+        password_hash: str,
+        otp_hash: str,
+        expires_at,
+    ) -> RegistrationVerification:
+        item = RegistrationVerification(
+            username=username.strip(),
+            email=email.strip().lower(),
+            password_hash=password_hash,
+            otp_hash=otp_hash,
+            expires_at=expires_at,
+            attempt_count=0,
+            last_requested_at=datetime.now(timezone.utc),
+            is_active=True,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        await self.session.refresh(item)
+        return item
+
+    async def update_registration_verification(
+        self,
+        verification: RegistrationVerification,
+        *,
+        otp_hash: str | None = None,
+        expires_at=None,
+        attempt_count: int | None = None,
+        last_requested_at=None,
+    ) -> RegistrationVerification:
+        if otp_hash is not None:
+            verification.otp_hash = otp_hash
+        if expires_at is not None:
+            verification.expires_at = expires_at
+        if attempt_count is not None:
+            verification.attempt_count = attempt_count
+        if last_requested_at is not None:
+            verification.last_requested_at = last_requested_at
+        await self.session.flush()
+        return verification
+
+    async def get_password_reset_verification(self, user_id: int) -> PasswordResetVerification | None:
+        return await self.session.scalar(
+            select(PasswordResetVerification).where(
+                PasswordResetVerification.user_id == user_id,
+                PasswordResetVerification.is_active.is_(True),
+            )
+        )
+
+    async def create_password_reset_verification(
+        self,
+        *,
+        user_id: int,
+        otp_hash: str,
+        expires_at,
+    ) -> PasswordResetVerification:
+        item = PasswordResetVerification(
+            user_id=user_id,
+            otp_hash=otp_hash,
+            expires_at=expires_at,
+            attempt_count=0,
+            last_requested_at=datetime.now(timezone.utc),
+            is_active=True,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        await self.session.refresh(item)
+        return item
+
+    async def update_password_reset_verification(
+        self,
+        verification: PasswordResetVerification,
+        *,
+        otp_hash: str | None = None,
+        expires_at=None,
+        attempt_count: int | None = None,
+        last_requested_at=None,
+        clear_verified_at: bool = False,
+    ) -> PasswordResetVerification:
+        if otp_hash is not None:
+            verification.otp_hash = otp_hash
+        if expires_at is not None:
+            verification.expires_at = expires_at
+        if attempt_count is not None:
+            verification.attempt_count = attempt_count
+        if last_requested_at is not None:
+            verification.last_requested_at = last_requested_at
+        if clear_verified_at:
+            verification.verified_at = None
+        await self.session.flush()
+        return verification
+
+    async def revoke_refresh_tokens(self, user_id: int) -> None:
+        await self.session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=datetime.now(timezone.utc))
+        )
+
     async def list_users(self) -> list[User]:
         stmt = self._active().order_by(User.username)
         return list((await self.session.scalars(stmt)).all())
 
-    async def create(self, payload: UserCreate, password_hash: str, allow_access: bool | None = None) -> User:
+    async def create(
+        self,
+        payload: UserCreate,
+        password_hash: str,
+        allow_access: bool | None = None,
+        is_active: bool | None = None,
+    ) -> User:
         user = User(
             username=payload.username.strip(),
             email=payload.email.strip().lower(),
             password_hash=password_hash,
             role=payload.role.upper(),
             allow_access=payload.allow_access if allow_access is None else allow_access,
-            is_active=payload.is_active,
+            is_active=payload.is_active if is_active is None else is_active,
         )
         self.session.add(user)
         await self.session.flush()
@@ -57,13 +176,6 @@ class UserRepository:
 
     async def get_refresh_token(self, token_hash: str) -> RefreshToken | None:
         return await self.session.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
-
-    async def revoke_refresh_tokens(self, user_id: int) -> None:
-        await self.session.execute(
-            update(RefreshToken)
-            .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
-            .values(revoked_at=datetime.now(timezone.utc))
-        )
 
     async def update(self, user: User, payload: UserUpdate, password_hash: str | None = None) -> User:
         if payload.username is not None:
