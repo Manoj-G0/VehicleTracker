@@ -4,7 +4,7 @@ pydantic==2.11.3
 pydantic-settings==2.8.1
 sqlalchemy[asyncio]==2.0.40
 asyncpg==0.30.0
-psycopg[binary]==3.2.6
+psycopg[binary]
 alembic==1.15.2
 openpyxl==3.1.5
 python-multipart==0.0.20
