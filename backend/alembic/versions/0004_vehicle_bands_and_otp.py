@@ -17,9 +17,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("vehicles", sa.Column("rm_rlf_band", sa.String(length=64), nullable=True))
-    op.add_column("vehicles", sa.Column("ip_band", sa.String(length=64), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c['name'] for c in inspector.get_columns("vehicles")]
 
+    if "rm_rlf_band" not in columns:
+        op.add_column("vehicles", sa.Column("rm_rlf_band", sa.String(length=64), nullable=True))
+    if "ip_band" not in columns:
+        op.add_column("vehicles", sa.Column("ip_band", sa.String(length=64), nullable=True))
+    
     op.create_table(
         "registration_verifications",
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
