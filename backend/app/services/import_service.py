@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import mark_vehicle_cache_dirty
 from app.core.exceptions import AppError, ValidationAppError
 from app.core.logging import get_logger
 from app.core.security import CurrentUser
@@ -105,7 +106,7 @@ class ImportService:
                 vehicle.er_id = group.identifiers.get("er_id")
                 vehicle.pems_id = group.identifiers.get("pems_id")
 
-                incoming = {item.name.lower(): item.name for item in group.variants}
+                incoming = {item.name.lower(): item for item in group.variants}
                 existing_names = {variant.variant_name.lower(): variant for variant in vehicle.variants}
 
                 if mode == ImportMode.REPLACE:
@@ -113,10 +114,25 @@ class ImportService:
                         if key not in incoming:
                             vehicle.variants.remove(variant)
 
-                for key, name in incoming.items():
-                    if key not in existing_names:
-                        vehicle.variants.append(Variant(variant_name=name))
+                for key, item in incoming.items():
+                    existing_variant = existing_names.get(key)
+                    if existing_variant is None:
+                        vehicle.variants.append(
+                            Variant(
+                                variant_name=item.name,
+                                equation=item.equation,
+                                cycle_energy_demand=item.cycle_energy_demand,
+                                co2=item.co2,
+                            )
+                        )
                         created_variants += 1
+                    else:
+                        if item.equation is not None:
+                            existing_variant.equation = item.equation
+                        if item.cycle_energy_demand is not None:
+                            existing_variant.cycle_energy_demand = item.cycle_energy_demand
+                        if item.co2 is not None:
+                            existing_variant.co2 = item.co2
 
             await self.session.flush()
             job = await self.jobs.create_completed(
@@ -129,6 +145,7 @@ class ImportService:
                 created_by=user.username,
                 started_at=started,
             )
+            mark_vehicle_cache_dirty(self.session)
         except Exception as exc:
             await self.session.rollback()
             logger.error("excel_import_failed", file_name=file_name)
@@ -177,7 +194,15 @@ class ImportService:
             ob_id=group.identifiers.get("ob_id"),
             er_id=group.identifiers.get("er_id"),
             pems_id=group.identifiers.get("pems_id"),
-            variants=[Variant(variant_name=item.name) for item in group.variants],
+            variants=[
+                Variant(
+                    variant_name=item.name,
+                    equation=item.equation,
+                    cycle_energy_demand=item.cycle_energy_demand,
+                    co2=item.co2,
+                )
+                for item in group.variants
+            ],
         )
         self.session.add(vehicle)
         await self.session.flush()

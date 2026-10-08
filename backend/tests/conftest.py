@@ -8,12 +8,14 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 import bcrypt
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from app.core.config import get_settings
+from app.core.cache import invalidate_session_cache, invalidate_vehicle_cache
 from app.db.session import get_db
 from app.main import app
 from app.models.vehicle import Vehicle  # noqa: F401
@@ -23,7 +25,7 @@ from app.services.user_service import UserService
 settings = get_settings()
 TEST_DATABASE_URL = settings.database_url
 
-engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True, poolclass=NullPool)
 TestSession = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
 
 
@@ -32,6 +34,7 @@ async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
+            await invalidate_session_cache(session)
         except Exception:
             await session.rollback()
             raise
@@ -47,6 +50,7 @@ async def clean_db() -> AsyncGenerator[None, None]:
         await conn.execute(text("DELETE FROM password_reset_verifications"))
         await conn.execute(text("DELETE FROM registration_verifications"))
         await conn.execute(text("DELETE FROM users"))
+    await invalidate_vehicle_cache()
     app.dependency_overrides[get_db] = _override_get_db
     yield
     app.dependency_overrides.clear()

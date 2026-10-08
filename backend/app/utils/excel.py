@@ -25,6 +25,12 @@ REQUIRED_HEADERS = {
     "ER ID": "er_id",
     "PEMS ID": "pems_id",
 }
+OPTIONAL_HEADERS = {
+    "EQUATION": "equation",
+    "CO2": "co2",
+    "CYCLE ENERGY DEMAND": "cycle_energy_demand",
+    "CED": "cycle_energy_demand",
+}
 
 ID_KEYS = ("rlf_id", "rm_id", "ip_id", "evap_id", "pr_id", "df_id", "ob_id", "er_id", "pems_id")
 
@@ -33,6 +39,9 @@ ID_KEYS = ("rlf_id", "rm_id", "ip_id", "evap_id", "pr_id", "df_id", "ob_id", "er
 class ParsedVariant:
     name: str
     row: int
+    equation: str | None = None
+    cycle_energy_demand: str | None = None
+    co2: str | None = None
 
 
 @dataclass
@@ -173,7 +182,15 @@ def parse_workbook(content: bytes, file_name: str) -> ParsedWorkbook:
                     )
                 )
                 continue
-            vehicle.variants.append(ParsedVariant(name=variant_name, row=index))
+            vehicle.variants.append(
+                ParsedVariant(
+                    name=variant_name,
+                    row=index,
+                    equation=values.get("equation"),
+                    cycle_energy_demand=values.get("cycle_energy_demand"),
+                    co2=values.get("co2"),
+                )
+            )
 
         vehicles = [grouped[name] for name in order]
         return ParsedWorkbook(
@@ -193,6 +210,8 @@ def _map_headers(header_row: tuple[Any, ...]) -> dict[str, int]:
         header = normalize_header(cell)
         if header in REQUIRED_HEADERS:
             found[REQUIRED_HEADERS[header]] = index
+        elif header in OPTIONAL_HEADERS:
+            found[OPTIONAL_HEADERS[header]] = index
 
     missing = [label for label, key in REQUIRED_HEADERS.items() if key not in found]
     if missing:

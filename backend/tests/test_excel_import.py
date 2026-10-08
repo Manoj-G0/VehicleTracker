@@ -116,6 +116,26 @@ async def test_successful_import_and_normalization(client):
     assert len(detail.json()["variants"]) == 3
 
 
+async def test_import_persists_variant_metadata(client):
+    headers = HEADERS + ["Equation", "CO2", "Cycle Energy Demand"]
+    rows = [
+        ["Vehicle Metadata", "Variant One", None, None, None, None, None, None, None, None, None,
+         "EQ-123", "42 g/km", "18.5 kWh/100km"],
+    ]
+    response = await client.post("/api/v1/imports/vehicles", files=_file(_workbook(rows, headers)))
+    assert response.status_code == 200
+
+    listed = await client.get("/api/v1/vehicles", params={"base_model_name": "Vehicle Metadata"})
+    vehicle_id = listed.json()["items"][0]["id"]
+    detail = await client.get(f"/api/v1/vehicles/{vehicle_id}/variants")
+    variant = detail.json()["items"][0]
+
+    assert variant["variant_name"] == "Variant One"
+    assert variant["equation"] == "EQ-123"
+    assert variant["co2"] == "42 g/km"
+    assert variant["cycle_energy_demand"] == "18.5 kWh/100km"
+
+
 async def test_multiple_ob_id_records_imported(client):
     await client.post("/api/v1/imports/vehicles", files=_file(_workbook(SAMPLE_ROWS)))
     response = await client.get("/api/v1/vehicles", params={"ob_id": "OB-123"})

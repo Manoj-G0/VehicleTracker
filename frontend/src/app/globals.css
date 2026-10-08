@@ -454,14 +454,18 @@ h2, h3, h4 { margin: 0; font-family: "Space Grotesk", sans-serif; }
 
 .variant-scroll {
   max-height: 260px;
+  min-height: 0;
   overflow-y: auto;
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 8px;
 }
 
 .variant-tile {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  min-width: 0;
   min-height: 52px;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -473,11 +477,13 @@ h2, h3, h4 { margin: 0; font-family: "Space Grotesk", sans-serif; }
 .variant-tile-main {
   display: grid;
   gap: 4px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 
 .variant-tile-main small {
   color: var(--gray-500);
+  overflow-wrap: anywhere;
 }
 
 .variant-form-grid {

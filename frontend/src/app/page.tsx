@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { VehicleDetail, VehicleFilters, VehiclePage } from "@/types/vehicle";
 import type { ImportPreview, ImportResult } from "@/types/api";
 import { identifierLabels, labels } from "@/config/labels";
@@ -124,6 +124,8 @@ export default function Home() {
   const [variantPage, setVariantPage] = useState(1);
   const [variantTotalPages, setVariantTotalPages] = useState(0);
   const [variantLoading, setVariantLoading] = useState(false);
+  const vehicleOpenRequest = useRef(0);
+  const variantLoadRequest = useRef(0);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(EMPTY_VEHICLE_FORM);
   const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
   const [vehicleError, setVehicleError] = useState("");
@@ -230,27 +232,45 @@ export default function Home() {
 
   async function openVehicle(id: number) {
     if (!token) return;
+    const requestId = ++vehicleOpenRequest.current;
+    const variantRequestId = ++variantLoadRequest.current;
+    setSelected(null);
+    setVariantItems([]);
+    setVariantPage(1);
+    setVariantTotalPages(0);
+    setVariantLoading(true);
     try {
       const payload = await api<VehicleDetail>(`/vehicles/${id}`, { method: "GET" }, token);
+      if (requestId !== vehicleOpenRequest.current) return;
       setSelected(payload);
       await loadVariants(id, 1, false);
     } catch {
-      setSearchError("Unable to load vehicle details");
+      if (requestId === vehicleOpenRequest.current) {
+        setSearchError("Unable to load vehicle details");
+      }
+    } finally {
+      if (requestId === vehicleOpenRequest.current && variantLoadRequest.current === variantRequestId) {
+        setVariantLoading(false);
+      }
     }
   }
 
   async function loadVariants(vehicleId: number, requestedPage: number, append: boolean) {
     if (!token) return;
+    const requestId = ++variantLoadRequest.current;
     setVariantLoading(true);
     try {
       const payload = await api<{ items: VehicleDetail["variants"]; page: number; total_pages: number }>(
         `/vehicles/${vehicleId}/variants?page=${requestedPage}&page_size=20`, { method: "GET" }, token,
       );
+      if (requestId !== variantLoadRequest.current) return;
       setVariantItems((current) => append ? [...current, ...payload.items] : payload.items);
       setVariantPage(payload.page);
       setVariantTotalPages(payload.total_pages);
     } finally {
-      setVariantLoading(false);
+      if (requestId === variantLoadRequest.current) {
+        setVariantLoading(false);
+      }
     }
   }
 
@@ -512,7 +532,10 @@ export default function Home() {
             ? current.variants.map((variant) => variant.id === savedVariant.id ? savedVariant : variant)
             : [...current.variants, savedVariant],
         } : current);
-        await loadVariants(selected.id, 1, false);
+        await Promise.all([
+          loadVariants(selected.id, 1, false),
+          fetchVehicles(token),
+        ]);
         setVariantModalOpen(false);
       } catch (reason) {
         setSearchError(reason instanceof Error ? reason.message : "Unable to save variant");
@@ -549,7 +572,10 @@ export default function Home() {
         ...current,
         variants: current.variants.filter((variant) => variant.id !== variantId),
       } : current);
-      await loadVariants(selected.id, 1, false);
+      await Promise.all([
+        loadVariants(selected.id, 1, false),
+        fetchVehicles(token),
+      ]);
     } catch (reason) {
       setSearchError(reason instanceof Error ? reason.message : "Unable to delete variant");
     }

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from app.api.router import api_router
+from app.core.cache import close_cache, initialize_cache
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -21,8 +22,10 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("application_startup", app=settings.app_name, env=settings.app_env)
+    await initialize_cache()
     yield
     logger.info("application_shutdown", app=settings.app_name)
+    await close_cache()
     await engine.dispose()
 
 

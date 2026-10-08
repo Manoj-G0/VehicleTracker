@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+asyncpg://vehicle_user:vehicle_password@localhost:5432/vehicle_master"
     )
+    redis_url: str = "redis://localhost:6379/0"
+    redis_cache_ttl_seconds: int = Field(default=60, ge=1)
 
     cors_origins: str = "http://localhost:3000"
 
