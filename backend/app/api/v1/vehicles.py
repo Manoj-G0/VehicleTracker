@@ -40,6 +40,7 @@ async def list_vehicles(
     page: int = Query(default=1, ge=1),
     page_size: int | None = Query(default=None, ge=1),
     base_model_name: str | None = Query(default=None),
+    vehicle_manufacturer: str | None = Query(default=None),
     rlf_id: str | None = Query(default=None),
     rm_id: str | None = Query(default=None),
     ip_id: str | None = Query(default=None),
@@ -58,6 +59,7 @@ async def list_vehicles(
 ) -> VehiclePage:
     filters = VehicleFilterParams(
         base_model_name=base_model_name,
+        vehicle_manufacturer=vehicle_manufacturer,
         rlf_id=rlf_id,
         rm_id=rm_id,
         ip_id=ip_id,
@@ -81,6 +83,7 @@ async def list_vehicles(
 )
 async def export_vehicles(
     base_model_name: str | None = Query(default=None),
+    vehicle_manufacturer: str | None = Query(default=None),
     rlf_id: str | None = Query(default=None),
     rm_id: str | None = Query(default=None),
     ip_id: str | None = Query(default=None),
@@ -98,6 +101,7 @@ async def export_vehicles(
 ) -> StreamingResponse:
     filters = VehicleFilterParams(
         base_model_name=base_model_name,
+        vehicle_manufacturer=vehicle_manufacturer,
         rlf_id=rlf_id,
         rm_id=rm_id,
         ip_id=ip_id,

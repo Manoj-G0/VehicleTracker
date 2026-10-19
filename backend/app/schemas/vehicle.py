@@ -10,6 +10,7 @@ from app.utils.normalization import normalize_identifier
 
 class VehicleFilterParams(BaseModel):
     base_model_name: str | None = None
+    vehicle_manufacturer: str | None = None
     rlf_id: str | None = None
     rm_id: str | None = None
     ip_id: str | None = None
@@ -25,6 +26,7 @@ class VehicleFilterParams(BaseModel):
 
     @field_validator(
         "base_model_name",
+        "vehicle_manufacturer",
         "rlf_id",
         "rm_id",
         "ip_id",
@@ -49,6 +51,7 @@ class VehicleFilterParams(BaseModel):
 
 class VehicleBase(BaseModel):
     base_model_name: str = Field(..., min_length=1, max_length=512)
+    vehicle_manufacturer: str | None = Field(default=None, max_length=255)
     rlf_id: str | None = Field(default=None, max_length=255)
     rm_id: str | None = Field(default=None, max_length=255)
     ip_id: str | None = Field(default=None, max_length=255)
@@ -68,6 +71,14 @@ class VehicleBase(BaseModel):
         if not trimmed:
             raise ValueError("Base model name is required")
         return trimmed
+
+    @field_validator("vehicle_manufacturer", mode="before")
+    @classmethod
+    def _trim_manufacturer(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = str(value).strip()
+        return trimmed or None
 
     @field_validator(
         "rlf_id",

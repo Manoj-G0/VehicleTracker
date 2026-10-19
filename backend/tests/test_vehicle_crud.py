@@ -4,11 +4,15 @@ from tests.conftest import sample_vehicle_payload
 
 
 async def test_create_valid_vehicle(client):
-    response = await client.post("/api/v1/vehicles", json=sample_vehicle_payload())
+    response = await client.post(
+        "/api/v1/vehicles",
+        json=sample_vehicle_payload(vehicle_manufacturer=" Kia "),
+    )
     assert response.status_code == 201
     body = response.json()
     assert body["base_model_name"].startswith("Kia Sorento")
     assert body["ob_id"] == "OB-123"
+    assert body["vehicle_manufacturer"] == "Kia"
     assert len(body["variants"]) == 2
 
 
@@ -59,12 +63,18 @@ async def test_create_normalizes_placeholder_ids(client):
 
 
 async def test_get_vehicle_detail(client):
-    created = (await client.post("/api/v1/vehicles", json=sample_vehicle_payload())).json()
+    created = (
+        await client.post(
+            "/api/v1/vehicles",
+            json=sample_vehicle_payload(vehicle_manufacturer="Ford"),
+        )
+    ).json()
     response = await client.get(f"/api/v1/vehicles/{created['id']}")
     assert response.status_code == 200
     body = response.json()
     assert len(body["variants"]) == 2
     assert body["pems_id"] == "PEMS-123"
+    assert body["vehicle_manufacturer"] == "Ford"
 
 
 async def test_get_vehicle_not_found(client):
@@ -77,6 +87,7 @@ async def test_update_vehicle_and_variants(client):
     created = (await client.post("/api/v1/vehicles", json=sample_vehicle_payload())).json()
     payload = sample_vehicle_payload(
         ip_id="IP-999",
+        vehicle_manufacturer="BMW",
         variants=[{"variant_name": "HTX 7"}, {"variant_name": "GT-Line"}],
     )
     response = await client.put(f"/api/v1/vehicles/{created['id']}", json=payload)
@@ -84,6 +95,7 @@ async def test_update_vehicle_and_variants(client):
     names = {item["variant_name"] for item in response.json()["variants"]}
     assert names == {"HTX 7", "GT-Line"}
     assert response.json()["ip_id"] == "IP-999"
+    assert response.json()["vehicle_manufacturer"] == "BMW"
 
 
 async def test_update_rejects_duplicate_variants(client):

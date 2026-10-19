@@ -39,8 +39,18 @@ class ConflictError(AppError):
 
 
 class ValidationAppError(AppError):
-    def __init__(self, message: str, field: str | None = None) -> None:
-        super().__init__(message, status_code=status.HTTP_400_BAD_REQUEST, field=field)
+    def __init__(
+        self,
+        message: str,
+        field: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            field=field,
+            extra=extra,
+        )
 
 
 class PayloadTooLargeError(AppError):

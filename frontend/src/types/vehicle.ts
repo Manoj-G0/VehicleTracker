@@ -1,5 +1,6 @@
 export type VehicleFilters = {
   base_model_name?: string;
+  vehicle_manufacturer?: string;
   rlf_id?: string;
   rm_id?: string;
   ip_id?: string;
@@ -27,6 +28,7 @@ export type Variant = {
 export type VehicleListItem = {
   id: number;
   base_model_name: string;
+  vehicle_manufacturer: string | null;
   rlf_id: string | null;
   rm_id: string | null;
   ip_id: string | null;
@@ -51,6 +53,7 @@ export type VehicleDetail = Omit<VehicleListItem, "variant_count"> & {
 
 export type VehicleWritePayload = {
   base_model_name: string;
+  vehicle_manufacturer: string | null;
   rlf_id: string | null;
   rm_id: string | null;
   ip_id: string | null;

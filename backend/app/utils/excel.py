@@ -26,6 +26,7 @@ REQUIRED_HEADERS = {
     "PEMS ID": "pems_id",
 }
 OPTIONAL_HEADERS = {
+    "VEHICLE MANUFACTURER": "vehicle_manufacturer",
     "EQUATION": "equation",
     "CO2": "co2",
     "CYCLE ENERGY DEMAND": "cycle_energy_demand",
@@ -48,6 +49,8 @@ class ParsedVariant:
 class ParsedVehicle:
     base_model_name: str
     identifiers: dict[str, str | None]
+    vehicle_manufacturer: str | None = None
+    vehicle_manufacturer_row: int | None = None
     variants: list[ParsedVariant] = field(default_factory=list)
     first_row: int = 0
     duplicate_variant_names: list[str] = field(default_factory=list)
@@ -149,10 +152,34 @@ def parse_workbook(content: bytes, file_name: str) -> ParsedWorkbook:
                 grouped[group_key] = ParsedVehicle(
                     base_model_name=current_base,
                     identifiers=identifiers,
+                    vehicle_manufacturer=values.get("vehicle_manufacturer"),
+                    vehicle_manufacturer_row=index if values.get("vehicle_manufacturer") else None,
                     first_row=index,
                 )
                 order.append(group_key)
             else:
+                incoming_manufacturer = values.get("vehicle_manufacturer")
+                vehicle_manufacturer = grouped[group_key].vehicle_manufacturer
+                if incoming_manufacturer and vehicle_manufacturer is None:
+                    grouped[group_key].vehicle_manufacturer = incoming_manufacturer
+                    grouped[group_key].vehicle_manufacturer_row = index
+                elif (
+                    incoming_manufacturer
+                    and vehicle_manufacturer
+                    and " ".join(incoming_manufacturer.casefold().split())
+                    != " ".join(vehicle_manufacturer.casefold().split())
+                ):
+                    errors.append(
+                        ParseIssue(
+                            row=index,
+                            field="vehicle_manufacturer",
+                            message=(
+                                f"Conflicting vehicle manufacturer for '{grouped[group_key].base_model_name}': "
+                                f"'{incoming_manufacturer}' does not match '{vehicle_manufacturer}' "
+                                f"from row {grouped[group_key].vehicle_manufacturer_row}"
+                            ),
+                        )
+                    )
                 for key in ID_KEYS:
                     incoming = values.get(key)
                     existing = grouped[group_key].identifiers.get(key)
@@ -230,7 +257,7 @@ def _row_values(row: tuple[Any, ...], mapping: dict[str, int]) -> dict[str, str 
     values: dict[str, str | None] = {}
     for key, index in mapping.items():
         raw = row[index] if index < len(row) else None
-        if key in {"base_model_name", "variant_name"}:
+        if key in {"base_model_name", "variant_name", "vehicle_manufacturer"}:
             text = _cell_text(raw)
             values[key] = text or None
         else:

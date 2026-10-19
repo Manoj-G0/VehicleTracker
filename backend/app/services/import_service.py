@@ -75,7 +75,15 @@ class ImportService:
         started = datetime.now(timezone.utc)
         parsed = self._parse(content, file_name, max_bytes)
         if parsed.errors:
-            raise ValidationAppError("The workbook contains validation errors and cannot be imported")
+            raise ValidationAppError(
+                "The workbook contains validation errors and cannot be imported",
+                extra={
+                    "errors": [
+                        {"row": item.row, "field": item.field, "message": item.message}
+                        for item in parsed.errors
+                    ]
+                },
+            )
 
         logger.info("excel_import_start", file_name=file_name, mode=mode, total_rows=parsed.total_rows)
         existing = await self.vehicles.get_by_names([item.base_model_name for item in parsed.vehicles])
@@ -96,6 +104,8 @@ class ImportService:
                     continue
 
                 updated_vehicles += 1
+                if group.vehicle_manufacturer is not None:
+                    vehicle.vehicle_manufacturer = group.vehicle_manufacturer
                 vehicle.rlf_id = group.identifiers.get("rlf_id")
                 vehicle.rm_id = group.identifiers.get("rm_id")
                 vehicle.ip_id = group.identifiers.get("ip_id")
@@ -185,6 +195,7 @@ class ImportService:
     async def _create_from_group(self, group: ParsedVehicle) -> Vehicle:
         vehicle = Vehicle(
             base_model_name=group.base_model_name,
+            vehicle_manufacturer=group.vehicle_manufacturer,
             rlf_id=group.identifiers.get("rlf_id"),
             rm_id=group.identifiers.get("rm_id"),
             ip_id=group.identifiers.get("ip_id"),

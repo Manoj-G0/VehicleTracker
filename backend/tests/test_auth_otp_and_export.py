@@ -1,8 +1,10 @@
 from tests.conftest import sample_vehicle_payload
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import select
 
 from app.core.exceptions import AppError
@@ -252,12 +254,29 @@ def test_otp_email_contains_branded_html(monkeypatch):
 
 
 async def test_export_returns_filtered_variant_rows(client):
-    payload = sample_vehicle_payload(base_model_name="Exportable One", variants=[{"variant_name": "V1"}, {"variant_name": "V2"}])
-    created = (await client.post("/api/v1/vehicles", json=payload)).json()
+    payload = sample_vehicle_payload(
+        base_model_name="Exportable One",
+        vehicle_manufacturer="Ford",
+        variants=[{"variant_name": "V1"}, {"variant_name": "V2"}],
+    )
+    await client.post("/api/v1/vehicles", json=payload)
+    await client.post(
+        "/api/v1/vehicles",
+        json=sample_vehicle_payload(
+            base_model_name="Exportable Two",
+            vehicle_manufacturer="Kia",
+            variants=[{"variant_name": "Other"}],
+        ),
+    )
     response = await client.get(
         "/api/v1/vehicles/export",
-        params={"base_model_name": "Exportable One"},
+        params={"vehicle_manufacturer": "for"},
     )
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     assert b"Exportable One" in response.content
+    sheet = load_workbook(BytesIO(response.content), read_only=True, data_only=True).active
+    rows = list(sheet.iter_rows(values_only=True))
+    manufacturer_column = rows[0].index("Vehicle Manufacturer")
+    assert [row[manufacturer_column] for row in rows[1:]] == ["Ford", "Ford"]
+    assert [row[0] for row in rows[1:]] == ["Exportable One", "Exportable One"]

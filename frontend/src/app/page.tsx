@@ -21,6 +21,7 @@ type StoredAuth = { token: string; refreshToken: string; user: AuthUser };
 type VariantDraft = { variant_name: string; equation: string; cycle_energy_demand: string; co2: string };
 type VehicleForm = {
   base_model_name: string;
+  vehicle_manufacturer: string;
   rlf_id: string;
   rm_id: string;
   rm_rlf_band: string;
@@ -49,12 +50,14 @@ type FilterField = {
 
 const FILTER_FIELDS: FilterField[] = [
   { key: "base_model_name", label: labels.vehicle.baseModelName },
+  { key: "vehicle_manufacturer", label: labels.vehicle.vehicleManufacturer },
   ...Object.entries(identifierLabels).map(([key, label]) => ({ key: key as keyof VehicleFilters, label })),
   { key: "variant_name", label: labels.vehicle.variantName },
 ];
 
 const EMPTY_VEHICLE_FORM = {
   base_model_name: "",
+  vehicle_manufacturer: "",
   rlf_id: "",
   rm_id: "",
   rm_rlf_band: "",
@@ -612,6 +615,7 @@ export default function Home() {
     setEditingVehicleId(vehicle.id);
     setVehicleForm({
       base_model_name: vehicle.base_model_name,
+      vehicle_manufacturer: vehicle.vehicle_manufacturer ?? "",
       rlf_id: vehicle.rlf_id ?? "",
       rm_id: vehicle.rm_id ?? "",
       rm_rlf_band: vehicle.rm_rlf_band ?? "",
@@ -994,9 +998,14 @@ export default function Home() {
                   <span>{labels.vehicle.baseModelName}</span>
                   <input value={vehicleForm.base_model_name} onChange={(event) => setVehicleForm((current) => ({ ...current, base_model_name: event.target.value }))} />
                 </label>
+                <label>
+                  <span>{labels.vehicle.vehicleManufacturer}</span>
+                  <input maxLength={255} value={vehicleForm.vehicle_manufacturer} onChange={(event) => setVehicleForm((current) => ({ ...current, vehicle_manufacturer: event.target.value }))} />
+                </label>
               </div>
               <div className="input-row two-col">
                 {[
+                  ["vehicle_manufacturer", labels.vehicle.vehicleManufacturer],
                   ["rlf_id", "RLF ID"],
                   ["rm_id", "RM ID"],
                   ["rm_rlf_band", "RM/RLF Band"],
@@ -1143,6 +1152,7 @@ export default function Home() {
             {admin && <div className="actions-row"><button className="ghost-button" onClick={() => startEdit(selected)}>{labels.common.edit}</button><button className="danger-button" onClick={() => { void deleteVehicle(selected.id); setSelected(null); }}>{labels.common.delete}</button></div>}
             <div className="modal-grid">
               {[
+                ["vehicle_manufacturer", labels.vehicle.vehicleManufacturer],
                 ["rlf_id", "RLF ID"],
                 ["rm_id", "RM ID"],
                 ["ip_id", "IP ID"],

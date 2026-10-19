@@ -143,6 +143,7 @@ class VehicleService:
         worksheet.title = "Vehicles"
         headers = [
             "Base Model Name",
+            "Vehicle Manufacturer",
             "RLF ID",
             "RM ID",
             "IP ID",
@@ -164,6 +165,7 @@ class VehicleService:
         for vehicle in vehicles:
             base_row = [
                 vehicle.base_model_name,
+                vehicle.vehicle_manufacturer,
                 vehicle.rlf_id,
                 vehicle.rm_id,
                 vehicle.ip_id,
@@ -186,6 +188,7 @@ class VehicleService:
             for variant in vehicle.variants:
                 worksheet.append([
                     vehicle.base_model_name,
+                    vehicle.vehicle_manufacturer,
                     vehicle.rlf_id,
                     vehicle.rm_id,
                     vehicle.ip_id,

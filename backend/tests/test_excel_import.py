@@ -136,6 +136,68 @@ async def test_import_persists_variant_metadata(client):
     assert variant["cycle_energy_demand"] == "18.5 kWh/100km"
 
 
+async def test_import_manufacturer_groups_multiple_variant_rows(client):
+    headers = HEADERS + ["Vehicle Manufacturer"]
+    rows = [
+        ["Ford Focus", "SE", "RL-1", None, None, None, None, None, None, None, None, "Ford"],
+        ["Ford Focus", "Titanium", None, None, None, None, None, None, None, None, None, "FORD"],
+    ]
+    response = await client.post("/api/v1/imports/vehicles", files=_file(_workbook(rows, headers)))
+    assert response.status_code == 200
+    assert response.json()["created_vehicles"] == 1
+    assert response.json()["created_variants"] == 2
+
+    listed = await client.get("/api/v1/vehicles", params={"base_model_name": "Ford Focus"})
+    assert listed.json()["total"] == 1
+    vehicle = listed.json()["items"][0]
+    assert vehicle["vehicle_manufacturer"] == "Ford"
+    detail = await client.get(f"/api/v1/vehicles/{vehicle['id']}")
+    assert {item["variant_name"] for item in detail.json()["variants"]} == {"SE", "Titanium"}
+
+
+async def test_import_rejects_conflicting_manufacturer_with_row_error(client):
+    headers = HEADERS + ["Vehicle Manufacturer"]
+    rows = [
+        ["Vehicle Conflict", "Base", None, None, None, None, None, None, None, None, None, "Kia"],
+        [None, "Other", None, None, None, None, None, None, None, None, None, "Hyundai"],
+    ]
+    content = _workbook(rows, headers)
+    preview = await client.post("/api/v1/imports/vehicles/preview", files=_file(content))
+    issue = preview.json()["errors"][0]
+    assert issue["row"] == 3
+    assert issue["field"] == "vehicle_manufacturer"
+    assert "Kia" in issue["message"] and "Hyundai" in issue["message"]
+
+    imported = await client.post("/api/v1/imports/vehicles", files=_file(content))
+    assert imported.status_code == 400
+    assert imported.json()["errors"][0] == issue
+    assert (await client.get("/api/v1/vehicles")).json()["total"] == 0
+
+
+async def test_legacy_import_preserves_existing_manufacturer(client):
+    await client.post(
+        "/api/v1/vehicles",
+        json={
+            "base_model_name": "Legacy Import Vehicle",
+            "vehicle_manufacturer": "Kia",
+            "variants": [{"variant_name": "Original"}],
+        },
+    )
+    legacy_rows = [
+        ["Legacy Import Vehicle", "Imported", None, None, None, None, None, None, None, None, None],
+    ]
+    result = await client.post(
+        "/api/v1/imports/vehicles",
+        files=_file(_workbook(legacy_rows)),
+    )
+    assert result.status_code == 200
+    listing = await client.get(
+        "/api/v1/vehicles",
+        params={"base_model_name": "Legacy Import Vehicle"},
+    )
+    assert listing.json()["items"][0]["vehicle_manufacturer"] == "Kia"
+
+
 async def test_multiple_ob_id_records_imported(client):
     await client.post("/api/v1/imports/vehicles", files=_file(_workbook(SAMPLE_ROWS)))
     response = await client.get("/api/v1/vehicles", params={"ob_id": "OB-123"})

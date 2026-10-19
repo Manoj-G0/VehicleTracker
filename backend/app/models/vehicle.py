@@ -36,6 +36,7 @@ class Vehicle(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     base_model_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    vehicle_manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rlf_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rm_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ip_id: Mapped[str | None] = mapped_column(String(255), nullable=True)

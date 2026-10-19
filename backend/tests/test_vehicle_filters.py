@@ -8,6 +8,7 @@ async def _seed(client) -> None:
         "/api/v1/vehicles",
         json=sample_vehicle_payload(
             base_model_name="Vehicle A",
+            vehicle_manufacturer="Ford",
             rlf_id="RL-A",
             rm_id="RM-A",
             ip_id="IP-123",
@@ -24,6 +25,7 @@ async def _seed(client) -> None:
         "/api/v1/vehicles",
         json=sample_vehicle_payload(
             base_model_name="Vehicle B",
+            vehicle_manufacturer="Kia",
             rlf_id="RL-B",
             rm_id="RM-B",
             ip_id="IP-999",
@@ -40,6 +42,7 @@ async def _seed(client) -> None:
         "/api/v1/vehicles",
         json=sample_vehicle_payload(
             base_model_name="Vehicle C",
+            vehicle_manufacturer="BMW",
             rlf_id="RL-C",
             rm_id="RM-C",
             ip_id="IP-123",
@@ -68,6 +71,7 @@ async def test_each_filter(client):
     await _seed(client)
     cases = {
         "base_model_name": ("Vehicle A", ["Vehicle A"]),
+        "vehicle_manufacturer": ("for", ["Vehicle A"]),
         "rlf_id": ("RL-B", ["Vehicle B"]),
         "rm_id": ("RM-C", ["Vehicle C"]),
         "ip_id": ("IP-999", ["Vehicle B"]),
@@ -97,6 +101,19 @@ async def test_ip_and_ob_intersection(client):
     response = await client.get("/api/v1/vehicles", params={"ip_id": "IP-123", "ob_id": "OB-123"})
     names = [item["base_model_name"] for item in response.json()["items"]]
     assert names == ["Vehicle A"]
+
+
+async def test_manufacturer_combines_with_other_filters_and_counts(client):
+    await _seed(client)
+    response = await client.get(
+        "/api/v1/vehicles",
+        params={"vehicle_manufacturer": "iA", "ob_id": "OB-123", "page": 1, "page_size": 1},
+    )
+    body = response.json()
+    assert body["total"] == 1
+    assert body["total_pages"] == 1
+    assert [item["base_model_name"] for item in body["items"]] == ["Vehicle B"]
+    assert body["items"][0]["vehicle_manufacturer"] == "Kia"
 
 
 async def test_variant_filter_no_duplicate_parents(client):

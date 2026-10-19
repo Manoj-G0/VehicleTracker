@@ -34,6 +34,7 @@ export const labels = {
     editTitle: "Edit Vehicle",
     filters: "Vehicle Filters",
     baseModelName: "Base Model Name",
+    vehicleManufacturer: "Vehicle Manufacturer",
     variantName: "Variant Name",
     variants: "Variants",
     addVariant: "Add Variant",

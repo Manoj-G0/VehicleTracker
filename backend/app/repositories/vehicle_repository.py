@@ -15,6 +15,7 @@ from app.utils.normalization import escape_ilike
 
 FILTER_COLUMNS = {
     "base_model_name": Vehicle.base_model_name,
+    "vehicle_manufacturer": Vehicle.vehicle_manufacturer,
     "rlf_id": Vehicle.rlf_id,
     "rm_id": Vehicle.rm_id,
     "ip_id": Vehicle.ip_id,
@@ -149,6 +150,7 @@ class VehicleRepository:
     async def create(self, payload: VehicleCreate) -> Vehicle:
         vehicle = Vehicle(
             base_model_name=payload.base_model_name,
+            vehicle_manufacturer=payload.vehicle_manufacturer,
             rlf_id=payload.rlf_id,
             rm_id=payload.rm_id,
             ip_id=payload.ip_id,
@@ -177,6 +179,7 @@ class VehicleRepository:
 
     async def update(self, vehicle: Vehicle, payload: VehicleUpdate) -> Vehicle:
         vehicle.base_model_name = payload.base_model_name
+        vehicle.vehicle_manufacturer = payload.vehicle_manufacturer
         vehicle.rlf_id = payload.rlf_id
         vehicle.rm_id = payload.rm_id
         vehicle.ip_id = payload.ip_id
